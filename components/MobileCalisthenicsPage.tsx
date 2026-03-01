@@ -543,7 +543,7 @@ const PLAN = {
   ]
 };
 
-function LinkButton({ link }) {
+function LinkButton({ link }: { link: { type: string; label: string; url: string; youtubeId?: string } }) {
   const icon = link.type === "video" ? <PlayCircle className="h-4 w-4" /> : <ExternalLink className="h-4 w-4" />;
   return (
     <Button asChild variant="secondary" className="w-full justify-between">
@@ -555,7 +555,7 @@ function LinkButton({ link }) {
   );
 }
 
-function ExerciseCard({ ex }) {
+function ExerciseCard({ ex }: { ex: typeof EXERCISES[number] }) {
   const yt = ex.links?.find((l) => l.youtubeId);
   return (
     <Card className="rounded-2xl shadow-sm">
@@ -568,7 +568,7 @@ function ExerciseCard({ ex }) {
             ))}
           </div>
         </div>
-        {yt ? (
+        {yt && yt.youtubeId ? (
           <a href={yt.url} target="_blank" rel="noreferrer" className="block">
             <div className="relative overflow-hidden rounded-xl">
               <img
@@ -617,7 +617,7 @@ function ExerciseCard({ ex }) {
   );
 }
 
-function WeekPlan({ week }) {
+function WeekPlan({ week }: { week: typeof PLAN.weeks[number] }) {
   return (
     <Card className="rounded-2xl shadow-sm">
       <CardHeader>
@@ -656,7 +656,8 @@ function WeekPlan({ week }) {
 
 const STORAGE_KEY = "calisthenics_core_upper_tracker_v1";
 
-function safeJsonParse(str, fallback) {
+function safeJsonParse(str: string | null, fallback: unknown): unknown {
+  if (!str) return fallback;
   try {
     return JSON.parse(str);
   } catch {
@@ -664,28 +665,30 @@ function safeJsonParse(str, fallback) {
   }
 }
 
-function createBlankDay(templateLength) {
+function createBlankDay(templateLength: number) {
   return { checks: Array.from({ length: templateLength }, () => false), rating: "", notes: "" };
 }
 
-function buildDefaultTracker(trackerTemplates) {
+function buildDefaultTracker(trackerTemplates: Record<string, string[]>) {
   const days = ["Day 1", "Day 2", "Day 3"];
-  const out = {};
+  const out: Record<string, Record<string, ReturnType<typeof createBlankDay>>> = {};
   Object.keys(trackerTemplates).forEach((wk) => {
-    const len = trackerTemplates[wk].length;
+    const len = trackerTemplates[wk as keyof typeof trackerTemplates].length;
     out[wk] = {};
     days.forEach((d) => (out[wk][d] = createBlankDay(len)));
   });
   return out;
 }
 
-function reconcileTracker(loaded, trackerTemplates) {
+function reconcileTracker(loaded: unknown, trackerTemplates: Record<string, string[]>) {
   const base = buildDefaultTracker(trackerTemplates);
   if (!loaded || typeof loaded !== "object") return base;
+  const loadedObj = loaded as Record<string, unknown>;
   for (const wk of Object.keys(base)) {
-    if (!loaded[wk]) continue;
+    if (!loadedObj[wk]) continue;
+    const loadedWeek = loadedObj[wk] as Record<string, unknown>;
     for (const day of Object.keys(base[wk])) {
-      const src = loaded[wk][day];
+      const src = loadedWeek[day] as Record<string, unknown>;
       if (!src) continue;
       const len = trackerTemplates[wk].length;
       const checks = Array.isArray(src.checks) ? src.checks.slice(0, len) : [];
@@ -700,7 +703,7 @@ function reconcileTracker(loaded, trackerTemplates) {
   return base;
 }
 
-function TrackerWeek({ weekNumber, template, value, onChange, onResetWeek }) {
+function TrackerWeek({ weekNumber, template, value, onChange, onResetWeek }: { weekNumber: number; template: string[]; value: Record<string, { checks: boolean[]; rating: string; notes: string }>; onChange: (next: Record<string, { checks: boolean[]; rating: string; notes: string }>) => void; onResetWeek: (wk: string) => void }) {
   const days = ["Day 1", "Day 2", "Day 3"];
 
   return (
@@ -782,13 +785,13 @@ function TrackerWeek({ weekNumber, template, value, onChange, onResetWeek }) {
   );
 }
 
-function formatTime(sec) {
+function formatTime(sec: number) {
   const m = Math.floor(sec / 60);
   const s = sec % 60;
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-function WorkoutTimer({ weeks }) {
+function WorkoutTimer({ weeks }: { weeks: typeof PLAN.weeks }) {
   const [week, setWeek] = useState(1);
   const [rounds, setRounds] = useState(weeks[0].workout.rounds);
   const [workSec, setWorkSec] = useState(45);
@@ -801,7 +804,7 @@ function WorkoutTimer({ weeks }) {
   const [round, setRound] = useState(1);
   const [index, setIndex] = useState(0);
 
-  const tickRef = useRef(null);
+  const tickRef = useRef<NodeJS.Timeout | null>(null);
 
   const currentWeek = useMemo(() => weeks.find((w) => w.week === week) ?? weeks[0], [week, weeks]);
   const items = currentWeek.workout.items;
@@ -1066,10 +1069,10 @@ export default function MobileCalisthenicsPage() {
 
   const trackerTemplates = useMemo(
     () => ({
-      1: ["Incline Push-Ups", "Dead Bug", "Negative Push-Ups", "Plank", "Rows", "Glute Bridge"],
-      2: ["Incline Push-Ups", "Rows", "Knee-to-elbow plank (optional)", "Hollow Hold", "Negative Push-Ups", "Superman"],
-      3: ["Push-Ups", "Rows", "Hollow Rocks", "Shoulder Taps", "Chair Dips", "Reverse Crunch"],
-      4: ["Push-Ups", "Rows", "Hollow Hold", "Russian Twists", "Pike Push-Ups", "Bent-knee leg raises"]
+      "1": ["Incline Push-Ups", "Dead Bug", "Negative Push-Ups", "Plank", "Rows", "Glute Bridge"],
+      "2": ["Incline Push-Ups", "Rows", "Knee-to-elbow plank (optional)", "Hollow Hold", "Negative Push-Ups", "Superman"],
+      "3": ["Push-Ups", "Rows", "Hollow Rocks", "Shoulder Taps", "Chair Dips", "Reverse Crunch"],
+      "4": ["Push-Ups", "Rows", "Hollow Hold", "Russian Twists", "Pike Push-Ups", "Bent-knee leg raises"]
     }),
     []
   );
@@ -1098,10 +1101,10 @@ export default function MobileCalisthenicsPage() {
     return EXERCISES.filter((e) => e.name.toLowerCase().includes(q) || e.tags.some((t) => t.toLowerCase().includes(q)));
   }, [query]);
 
-  const resetWeek = (wk) => {
+  const resetWeek = (wk: string) => {
     setTracker((prev) => {
       const next = structuredClone(prev);
-      const len = trackerTemplates[wk].length;
+      const len = trackerTemplates[wk as keyof typeof trackerTemplates]?.length ?? 0;
       ["Day 1", "Day 2", "Day 3"].forEach((d) => (next[wk][d] = createBlankDay(len)));
       return next;
     });
@@ -1218,7 +1221,7 @@ export default function MobileCalisthenicsPage() {
                 <TrackerWeek
                   key={wk}
                   weekNumber={wk}
-                  template={trackerTemplates[wk]}
+                  template={trackerTemplates[String(wk) as keyof typeof trackerTemplates]}
                   value={tracker[String(wk)]}
                   onChange={(nextWeek) => setTracker((prev) => ({ ...prev, [String(wk)]: nextWeek }))}
                   onResetWeek={resetWeek}
